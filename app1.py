@@ -59,8 +59,7 @@ if 'history' not in st.session_state:
     
 
 now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
-new_temp = np.random.randint(40, 80)
-new_sound = np.random.randint(40, 91)
+new_temp, new_sound = get_live_data() 
 
 new_data = pd.DataFrame({ 'Date-time': [now], 
                          'Temperature': [new_temp],
