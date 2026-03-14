@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 LOG_FILE = "motor_logs.csv"
 import os
-import pywhatkit as kit
+#import pywhatkit as kit
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import requests
