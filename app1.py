@@ -79,7 +79,6 @@ if new_temp > TEMP_LIMIT:
 if new_sound > SOUND_LIMIT:
     st.warning(f"🔔 ચેતવણી (WARNING): મશીનનો અવાજ વધી રહ્યો છે! લેવલ: {new_sound}dB")
 
-import pywhatkit as kit
 
 #if new_temp > TEMP_LIMIT:
     # મેસેજ મોકલવા માટે: (નંબર, મેસેજ)
