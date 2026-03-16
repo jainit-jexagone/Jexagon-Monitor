@@ -11,23 +11,16 @@ import os
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import requests
+import paho.mqtt.client as mqtt
+import json
+
+MQTT_USERNAME = "JC8ENgsWFwshGyMkJDk7GBE"
+MQTT_PASSWORD = "13vICKXl1feP81liIXJG56xS"
+MQTT_CLIENT_ID = "JC8ENgsWFwshGyMkJDk7GBE"
+MQTT_BROKER = "mqtt3.thingspeak.com"
 
 CHANNEL_ID = "3299971"
 READ_API_KEY = "JSZ9OOOK0UXVQJH3"
-
-def get_live_data():
-    url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/feeds.json?api_key={READ_API_KEY}&results=1"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        
-        temp = data['feeds'][0]['field1']
-        sound = data['feeds'][0]['field2']
-        
-        return float(temp), float(sound)
-    except Exception as e:
-        
-        return 0.0, 0.0
 
 def cleanup_old_data(filename):
     if os.path.exists(filename):
@@ -59,7 +52,34 @@ if 'history' not in st.session_state:
     
 
 now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
-new_temp, new_sound = get_live_data() 
+
+
+ # ડેટા સાચવવા માટે Session State
+if 'temp' not in st.session_state: st.session_state.temp = 0.0
+if 'sound' not in st.session_state: st.session_state.sound = 0.0
+
+new_temp = st.session_state.temp
+new_sound = st.session_state.sound
+
+def on_message(client, userdata, msg):
+    payload = msg.payload.decode()
+    val = float(payload)
+    if "field1" in msg.topic:
+        st.session_state.temp = val
+    elif "field2" in msg.topic:
+        st.session_state.sound = val
+
+client = mqtt.Client(client_id=MQTT_CLIENT_ID)
+client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+client.on_message = on_message
+
+# કનેક્ટ અને સબસ્ક્રાઇબ
+if 'mqtt_connected' not in st.session_state:
+    client.connect(MQTT_BROKER, 1883, 60)
+    client.subscribe(f"channels/{CHANNEL_ID}/subscribe/fields/field1")
+    client.subscribe(f"channels/{CHANNEL_ID}/subscribe/fields/field2")
+    client.loop_start()
+    st.session_state.mqtt_connected = True 
 
 new_data = pd.DataFrame({ 'Date-time': [now], 
                          'Temperature': [new_temp],
@@ -78,7 +98,6 @@ if new_temp > TEMP_LIMIT:
 if new_sound > SOUND_LIMIT:
     st.warning(f"🔔 ચેતવણી (WARNING): મશીનનો અવાજ વધી રહ્યો છે! લેવલ: {new_sound}dB")
 
-
 #if new_temp > TEMP_LIMIT:
     # મેસેજ મોકલવા માટે: (નંબર, મેસેજ)
     # અત્યારે આને કમેન્ટમાં રાખવું અથવા સાવચેતીથી વાપરવું
@@ -88,9 +107,9 @@ if new_sound > SOUND_LIMIT:
 
 user_phone = st.sidebar.text_input("worker number", value="+91")
 
-if new_temp > TEMP_LIMIT:
-    if len(user_phone) > 10: 
-        kit.sendwhatmsg_instantly(user_phone, f"🚨 મશીન એલર્ટ: તાપમાન વધી ગયું છે!")
+#if new_temp > TEMP_LIMIT:
+   # if len(user_phone) > 10: 
+        #kit.sendwhatmsg_instantly(user_phone, f"🚨 મશીન એલર્ટ: તાપમાન વધી ગયું છે!")
 
 st.session_state.history = pd.concat([st.session_state.history, new_data], ignore_index=True)
 
@@ -128,7 +147,7 @@ max_temp = display_data['Temperature'].max()
 min_temp = display_data['Temperature'].min()
 
 new_entry = pd.DataFrame([[current_time, new_temp, new_sound]], 
-                         columns=['Date-time', 'Temperature', 'Sound'])
+                         columns=['Date-time', 'Temperature', 'sound_level'])
 
 if not os.path.isfile(LOG_FILE):
     new_entry.to_csv(LOG_FILE, index=False)
