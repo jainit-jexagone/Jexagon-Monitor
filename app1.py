@@ -36,6 +36,20 @@ def cleanup_old_data(filename):
                 filtered_df.to_csv(filename, index=False)
         except Exception as e:
             st.error(f"Error cleaning data: {e}")
+
+
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    /* આ નીચેની લાઈન ખાસ ઉમેરજો Footer અને Badge કાઢવા માટે */
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    .viewerBadge_container__1QS13 {display: none !important;}
+    div.stDeployButton {display:none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_html=True)
 # GitHub આઈકન અને મેનૂ હટાવવા માટેનો જાદુઈ કોડ
 hide_style = """
     <style>
