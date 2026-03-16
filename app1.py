@@ -38,7 +38,15 @@ def cleanup_old_data(filename):
             st.error(f"Error cleaning data: {e}")
 
 
-st.set_page_config(page_title="Smart Factory", layout="wide")
+st.set_page_config(
+    page_title="Smart Factory", 
+    layout="wide",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
+)
 st.title("Smart Factory Dashboard")
 st.write("Welcome, motor monitoring system")
 
