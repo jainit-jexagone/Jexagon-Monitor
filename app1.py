@@ -36,7 +36,16 @@ def cleanup_old_data(filename):
                 filtered_df.to_csv(filename, index=False)
         except Exception as e:
             st.error(f"Error cleaning data: {e}")
-
+# GitHub આઈકન અને મેનૂ હટાવવા માટેનો જાદુઈ કોડ
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .viewerBadge_container__1QS13 {display: none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_html=True)
 
 st.set_page_config(
     page_title="Smart Factory", 
