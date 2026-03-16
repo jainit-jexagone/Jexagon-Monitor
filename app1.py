@@ -13,6 +13,27 @@ import plotly.graph_objects as go
 import requests
 import paho.mqtt.client as mqtt
 import json
+import requests
+# ૧. કોડની શરૂઆતમાં એક નવું 'ખાનું' (Session State) બનાવો
+if 'alert_sent' not in st.session_state:
+    st.session_state.alert_sent = False
+
+# ૨. WhatsApp મોકલવાનું ફંક્શન
+def send_whatsapp_alert(number, message):
+    api_key = "તારી_API_KEY" # અહીં તારી અસલી Key નાખજે
+    url = f"https://api.callmebot.com/whatsapp.php?phone={number}&text={message}&apikey={api_key}"
+    try:
+        requests.get(url)
+    except:
+        pass
+
+# ૩. સ્માર્ટ એલર્ટ લોજિક
+if new_temp > 70:
+    if not st.session_state.alert_sent:
+        send_whatsapp_alert("919978710321", "🚨 ALERT: Motor temperature crossed 70°C!")
+        st.session_state.alert_sent = True # એકવાર મેસેજ જાય એટલે આ 'True' થઈ જશે
+else:
+    st.session_state.alert_sent = False # જો તાપમાન 70 થી નીચે આવે, તો ફરી મેસેજ મોકલવા માટે તૈયાર
 
 MQTT_USERNAME = "JC8ENgsWFwshGyMkJDk7GBE"
 MQTT_PASSWORD = "13vICKXl1feP81liIXJG56xS"
