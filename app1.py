@@ -10,38 +10,87 @@ import os
 #import pywhatkit as kit
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
-import requests
 import paho.mqtt.client as mqtt
 import json
-import requests
-# ૧. કોડની શરૂઆતમાં એક નવું 'ખાનું' (Session State) બનાવો
-if 'alert_sent' not in st.session_state:
-    st.session_state.alert_sent = False
 
-# ૨. WhatsApp મોકલવાનું ફંક્શન
-def send_whatsapp_alert(number, message):
-    api_key = "તારી_API_KEY" # અહીં તારી અસલી Key નાખજે
-    url = f"https://api.callmebot.com/whatsapp.php?phone={number}&text={message}&apikey={api_key}"
+# --- Aa bhag tara Sidebar ma ke main page na niche muki de ---
+st.markdown("---")
+st.header("🔍 Historical Data Report (Calendar)")
+
+# 1. Calendar input (Owner mate ekdam saral)
+selected_date = st.date_input("Select Date for Report", value=datetime.now())
+
+if st.button("Show Report"):
+    LOG_FILE = "motor_logs.csv"
+    
+    # Check karo ke file che ke nahi
+    if os.path.exists(LOG_FILE):
+        # CSV file vancho
+        df_h = pd.read_csv(LOG_FILE)
+        
+        # Date-time column ne convert karo
+        df_h['Date-time'] = pd.to_datetime(df_h['Date-time'], format='%d/%m/%Y | %H:%M:%S')
+        
+        # Owner e select kareli date mujab data filter karo
+        filtered_data = df_h[df_h['Date-time'].dt.date == selected_date]
+        
+        if not filtered_data.empty:
+            st.success(f"📊 Displaying report for {selected_date}")
+            
+            # 2. Report no Graph (Owner ne joi ne maza padi jase)
+            fig_report = go.Figure()
+            fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['Temperature'], name='Temp (°C)', line=dict(color='#FF4B4B')))
+            fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['sound_level'], name='Sound (dB)', line=dict(color='#1C83E1')))
+            
+            fig_report.update_layout(title=f"Motor Performance on {selected_date}", template='plotly_dark')
+            st.plotly_chart(fig_report, use_container_width=True)
+            
+            # 3. Data Table (Jo owner ne numbers jova hoy to)
+            with st.expander("View Detailed Log Table"):
+                st.write(filtered_data)
+                
+            # Download Button (Jo owner ne Excel file joiye to)
+            csv_data = filtered_data.to_csv(index=False)
+            st.download_button("📥 Download This Report", data=csv_data, file_name=f"report_{selected_date}.csv", mime='text/csv')
+        else:
+            st.warning(f"⚠️ No data found for {selected_date}. Make sure the machine was ON.")
+    else:
+        st.error("❌ No log file found. Start the motor to generate data!")
+
+
+# --- ૧. ThingSpeak credentials કાઢીને આ નવા સેટિંગ્સ નાખો ---
+MQTT_BROKER = "broker.hivemq.com"
+MQTT_TOPIC = "janit/motor/data"
+
+# --- ૨. આ 'on_message' ફંક્શન ઉમેરો (ડેટા પકડવા અને સેવ કરવા માટે) ---
+def on_message(client, userdata, msg):
     try:
-        requests.get(url)
-    except:
+        # JSON ડેટા વાંચો
+        data = json.loads(msg.payload.decode())
+        st.session_state.temp = data['temp']
+        st.session_state.sound = data['sound']
+        
+        # લાઈવ હિસ્ટ્રી અને CSV (કેલેન્ડર માટે) અપડેટ કરો
+        now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
+        new_row = pd.DataFrame([[now, data['temp'], data['sound']]], 
+                                columns=['Date-time', 'Temperature', 'sound_level'])
+        
+        # ડેટાને Session State માં ઉમેરો
+        st.session_state.history = pd.concat([st.session_state.history, new_row], ignore_index=True)
+        
+        # ડેટાને CSV ફાઈલમાં કાયમી સેવ કરો (Calendar રિપોર્ટ માટે)
+        new_row.to_csv(LOG_FILE, mode='a', index=False, header=not os.path.exists(LOG_FILE))
+    except Exception as e:
         pass
 
-# ૩. સ્માર્ટ એલર્ટ લોજિક
-if new_temp > 70:
-    if not st.session_state.alert_sent:
-        send_whatsapp_alert("919978710321", "🚨 ALERT: Motor temperature crossed 70°C!")
-        st.session_state.alert_sent = True # એકવાર મેસેજ જાય એટલે આ 'True' થઈ જશે
-else:
-    st.session_state.alert_sent = False # જો તાપમાન 70 થી નીચે આવે, તો ફરી મેસેજ મોકલવા માટે તૈયાર
-
-MQTT_USERNAME = "JC8ENgsWFwshGyMkJDk7GBE"
-MQTT_PASSWORD = "13vICKXl1feP81liIXJG56xS"
-MQTT_CLIENT_ID = "JC8ENgsWFwshGyMkJDk7GBE"
-MQTT_BROKER = "mqtt3.thingspeak.com"
-
-CHANNEL_ID = "3299971"
-READ_API_KEY = "JSZ9OOOK0UXVQJH3"
+# --- ૩. આ MQTT કનેક્શન બ્લોક ઉમેરો (ThingSpeak વાળા કનેક્શનની જગ્યાએ) ---
+if 'mqtt_connected' not in st.session_state:
+    client = mqtt.Client()
+    client.on_message = on_message
+    client.connect(MQTT_BROKER, 1883, 60)
+    client.subscribe(MQTT_TOPIC)
+    client.loop_start()
+    st.session_state.mqtt_connected = True
 
 def cleanup_old_data(filename):
     if os.path.exists(filename):
@@ -121,17 +170,6 @@ def on_message(client, userdata, msg):
     elif "field2" in msg.topic:
         st.session_state.sound = val
 
-client = mqtt.Client(client_id=MQTT_CLIENT_ID)
-client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-client.on_message = on_message
-
-# કનેક્ટ અને સબસ્ક્રાઇબ
-if 'mqtt_connected' not in st.session_state:
-    client.connect(MQTT_BROKER, 1883, 60)
-    client.subscribe(f"channels/{CHANNEL_ID}/subscribe/fields/field1")
-    client.subscribe(f"channels/{CHANNEL_ID}/subscribe/fields/field2")
-    client.loop_start()
-    st.session_state.mqtt_connected = True 
 
 new_data = pd.DataFrame({ 'Date-time': [now], 
                          'Temperature': [new_temp],
