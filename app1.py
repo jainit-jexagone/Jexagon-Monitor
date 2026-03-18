@@ -13,49 +13,6 @@ import plotly.graph_objects as go
 import paho.mqtt.client as mqtt
 import json
 
-# --- Aa bhag tara Sidebar ma ke main page na niche muki de ---
-st.markdown("---")
-st.header("🔍 Historical Data Report (Calendar)")
-
-# 1. Calendar input (Owner mate ekdam saral)
-selected_date = st.date_input("Select Date for Report", value=datetime.now())
-
-if st.button("Show Report"):
-    LOG_FILE = "motor_logs.csv"
-    
-    # Check karo ke file che ke nahi
-    if os.path.exists(LOG_FILE):
-        # CSV file vancho
-        df_h = pd.read_csv(LOG_FILE)
-        
-        # Date-time column ne convert karo
-        df_h['Date-time'] = pd.to_datetime(df_h['Date-time'], format='%d/%m/%Y | %H:%M:%S')
-        
-        # Owner e select kareli date mujab data filter karo
-        filtered_data = df_h[df_h['Date-time'].dt.date == selected_date]
-        
-        if not filtered_data.empty:
-            st.success(f"📊 Displaying report for {selected_date}")
-            
-            # 2. Report no Graph (Owner ne joi ne maza padi jase)
-            fig_report = go.Figure()
-            fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['Temperature'], name='Temp (°C)', line=dict(color='#FF4B4B')))
-            fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['sound_level'], name='Sound (dB)', line=dict(color='#1C83E1')))
-            
-            fig_report.update_layout(title=f"Motor Performance on {selected_date}", template='plotly_dark')
-            st.plotly_chart(fig_report, use_container_width=True)
-            
-            # 3. Data Table (Jo owner ne numbers jova hoy to)
-            with st.expander("View Detailed Log Table"):
-                st.write(filtered_data)
-                
-            # Download Button (Jo owner ne Excel file joiye to)
-            csv_data = filtered_data.to_csv(index=False)
-            st.download_button("📥 Download This Report", data=csv_data, file_name=f"report_{selected_date}.csv", mime='text/csv')
-        else:
-            st.warning(f"⚠️ No data found for {selected_date}. Make sure the machine was ON.")
-    else:
-        st.error("❌ No log file found. Start the motor to generate data!")
 
 
 # --- ૧. ThingSpeak credentials કાઢીને આ નવા સેટિંગ્સ નાખો ---
@@ -255,38 +212,49 @@ with col3:
 with col4:
     st.metric("sound level",f"{last_sound}dB") 
 
+# --- Aa bhag tara Sidebar ma ke main page na niche muki de ---
 st.markdown("---")
-st.header("🔍 Search History (Single Day)")
+st.header("🔍 Historical Data Report (Calendar)")
 
-# આજના દિવસથી ૬ મહિના (૧૮૦ દિવસ) પહેલાની તારીખ ગણો
-six_months_ago = datetime.now() - timedelta(days=180)
-
-# કેલેન્ડરમાં લિમિટ મૂકો
-selected_date = st.date_input(
-    "Select Date", 
-    value=datetime.now(),
-    min_value=six_months_ago, # આનાથી જૂની તારીખ નહીં દેખાય
-    max_value=datetime.now()
-)
+# 1. Calendar input (Owner mate ekdam saral)
+selected_date = st.date_input("Select Date for Report", value=datetime.now())
 
 if st.button("Show Report"):
-    try:
+    LOG_FILE = "motor_logs.csv"
+    
+    # Check karo ke file che ke nahi
+    if os.path.exists(LOG_FILE):
+        # CSV file vancho
+        df_h = pd.read_csv(LOG_FILE)
         
-        df_history = pd.read_csv("motor_logs.csv")
+        # Date-time column ne convert karo
+        df_h['Date-time'] = pd.to_datetime(df_h['Date-time'], format='%d/%m/%Y | %H:%M:%S')
         
-        df_history['Date-time'] = pd.to_datetime(df_history['Date-time'], format='%d/%m/%Y | %H:%M:%S')
+        # Owner e select kareli date mujab data filter karo
+        filtered_data = df_h[df_h['Date-time'].dt.date == selected_date]
         
-        filtered_df = df_history[df_history['Date-time'].dt.date == selected_date]
-        
-        if not filtered_df.empty:
-            st.success(f"📊 Report for {selected_date}")
-            st.line_chart(filtered_df.set_index('Date-time')['Temperature'])
-            st.write(filtered_df)
-        else:
-            st.warning(f"Dilgiri, {selected_date} na divas no koi data save thayo nathi.")
+        if not filtered_data.empty:
+            st.success(f"📊 Displaying report for {selected_date}")
             
-    except FileNotFoundError:
-        st.error("Haji sudhi koi data save thayo nathi (CSV file missing).")
+            # 2. Report no Graph (Owner ne joi ne maza padi jase)
+            fig_report = go.Figure()
+            fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['Temperature'], name='Temp (°C)', line=dict(color='#FF4B4B')))
+            fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['sound_level'], name='Sound (dB)', line=dict(color='#1C83E1')))
+            
+            fig_report.update_layout(title=f"Motor Performance on {selected_date}", template='plotly_dark')
+            st.plotly_chart(fig_report, use_container_width=True)
+            
+            # 3. Data Table (Jo owner ne numbers jova hoy to)
+            with st.expander("View Detailed Log Table"):
+                st.write(filtered_data)
+                
+            # Download Button (Jo owner ne Excel file joiye to)
+            csv_data = filtered_data.to_csv(index=False)
+            st.download_button("📥 Download This Report", data=csv_data, file_name=f"report_{selected_date}.csv", mime='text/csv')
+        else:
+            st.warning(f"⚠️ No data found for {selected_date}. Make sure the machine was ON.")
+    else:
+        st.error("❌ No log file found. Start the motor to generate data!")
 
 st.markdown("---") 
 st.write(f"🕒 **Last Updated: {current_time}**")
