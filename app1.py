@@ -20,19 +20,18 @@ st.set_page_config(
     }
 )
 
-hide_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    /* આ નીચેની લાઈન ખાસ ઉમેરજો Footer અને Badge કાઢવા માટે */
-    div[data-testid="stStatusWidget"] {visibility: hidden;}
-    .viewerBadge_container__1QS13 {display: none !important;}
-    div.stDeployButton {display:none;}
-    </style>
-    """
-st.markdown(hide_style, unsafe_allow_html=True)
-
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            [data-testid="stDecoration"] {display:none !important;} 
+            [data-testid="stHeader"] {display:none !important;}    
+            .stDeployButton {display:none !important;}            
+            footer {display:none !important;}                   
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
 hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
