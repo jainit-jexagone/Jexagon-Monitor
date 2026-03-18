@@ -10,6 +10,39 @@ import plotly.graph_objects as go
 import paho.mqtt.client as mqtt
 import json
 
+st.set_page_config(
+    page_title="Smart Factory", 
+    layout="wide",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
+)
+
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    /* આ નીચેની લાઈન ખાસ ઉમેરજો Footer અને Badge કાઢવા માટે */
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    .viewerBadge_container__1QS13 {display: none !important;}
+    div.stDeployButton {display:none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_html=True)
+
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .viewerBadge_container__1QS13 {display: none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_html=True)
+
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_TOPIC = "janit/motor/data"
 
@@ -53,39 +86,6 @@ def cleanup_old_data(filename):
         except Exception as e:
             st.error(f"Error cleaning data: {e}")
 
-
-hide_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    /* આ નીચેની લાઈન ખાસ ઉમેરજો Footer અને Badge કાઢવા માટે */
-    div[data-testid="stStatusWidget"] {visibility: hidden;}
-    .viewerBadge_container__1QS13 {display: none !important;}
-    div.stDeployButton {display:none;}
-    </style>
-    """
-st.markdown(hide_style, unsafe_allow_html=True)
-
-hide_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .viewerBadge_container__1QS13 {display: none;}
-    </style>
-    """
-st.markdown(hide_style, unsafe_allow_html=True)
-
-st.set_page_config(
-    page_title="Smart Factory", 
-    layout="wide",
-    menu_items={
-        'Get Help': None,
-        'Report a bug': None,
-        'About': None
-    }
-)
 st.title("Smart Factory Dashboard")
 st.write("Welcome, motor monitoring system")
 
