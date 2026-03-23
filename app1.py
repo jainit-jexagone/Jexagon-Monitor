@@ -1,4 +1,4 @@
-st.set_page_config(page_title="ORIX Smart Factory", page_icon="1000046431.png", layout="wide")
+
 import streamlit as st
 import pandas as pd
 import numpy as np
