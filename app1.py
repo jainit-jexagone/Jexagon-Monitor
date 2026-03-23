@@ -6,52 +6,65 @@ import os
 import json
 import paho.mqtt.client as mqtt
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 1. PAGE SETUP
-st.set_page_config(page_title="Smart Factory", layout="wide")
+st.set_page_config(
+    page_title="Smart Factory", 
+    layout="wide"
+)
 
-# CSS to hide header/footer
-hide_style = """<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}</style>"""
+# CSS to hide Streamlit elements
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    .viewerBadge_container__1QS13 {display: none !important;}
+    div.stDeployButton {display:none;}
+    </style>
+    """
 st.markdown(hide_style, unsafe_allow_html=True)
 
 LOG_FILE = "motor_logs.csv"
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_TOPIC = "janit/motor/data"
 
-# 2. INITIALIZE SESSION STATE (Run only once)
+# 2. INITIALIZE SESSION STATE (At the very beginning)
+if 'temp' not in st.session_state: st.session_state.temp = 0.0
+if 'sound' not in st.session_state: st.session_state.sound = 0.0
+if 'new_data_arrived' not in st.session_state: st.session_state.new_data_arrived = False
+
 if 'history' not in st.session_state:
+    # Try to load existing data from CSV on startup
     if os.path.exists(LOG_FILE):
         try:
-            st.session_state.history = pd.read_csv(LOG_FILE)
+            df = pd.read_csv(LOG_FILE)
+            st.session_state.history = df
         except:
             st.session_state.history = pd.DataFrame(columns=['Date-time', 'Temperature', 'sound_level'])
     else:
         st.session_state.history = pd.DataFrame(columns=['Date-time', 'Temperature', 'sound_level'])
 
-if 'temp' not in st.session_state: st.session_state.temp = 0.0
-if 'sound' not in st.session_state: st.session_state.sound = 0.0
-if 'new_data_arrived' not in st.session_state: st.session_state.new_data_arrived = False
-
-# 3. MQTT CALLBACK FUNCTIONS
+# 3. MQTT CALLBACKS
 def on_message(client, userdata, msg):
     try:
         payload = msg.payload.decode()
         data = json.loads(payload)
-        # Update session state values
         st.session_state.temp = float(data.get('temp', 0))
         st.session_state.sound = float(data.get('sound', 0))
-        st.session_state.new_data_arrived = True
+        st.session_state.new_data_arrived = True 
     except Exception as e:
-        print(f"MQTT Error: {e}")
+        pass
 
-# 4. MQTT CLIENT SETUP
+# Initialize MQTT Client
 if 'mqtt_client' not in st.session_state:
-    # Use CallbackAPIVersion.VERSION2 for newer paho-mqtt versions
     try:
+        # Support for both paho-mqtt 1.x and 2.x
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     except:
-        client = mqtt.Client() # Fallback for older versions
+        client = mqtt.Client()
         
     client.on_message = on_message
     client.connect(MQTT_BROKER, 1883, 60)
@@ -59,93 +72,100 @@ if 'mqtt_client' not in st.session_state:
     client.loop_start()
     st.session_state.mqtt_client = client
 
-# 5. DATA SAVING LOGIC
-if st.session_state.new_data_arrived:
+# 4. DATA PROCESSING
+def save_data():
     now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
     temp = st.session_state.temp
     sound = st.session_state.sound
     
-    new_row = pd.DataFrame([[now, temp, sound]], columns=['Date-time', 'Temperature', 'sound_level'])
+    new_row = pd.DataFrame([[now, temp, sound]], 
+                            columns=['Date-time', 'Temperature', 'sound_level'])
     
-    # Update local CSV
-    new_row.to_csv(LOG_FILE, mode='a', index=False, header=not os.path.exists(LOG_FILE))
-    
-    # Update session state history
+    # Update Session State
     st.session_state.history = pd.concat([st.session_state.history, new_row], ignore_index=True)
+    # Save to CSV
+    new_row.to_csv(LOG_FILE, mode='a', index=False, header=not os.path.exists(LOG_FILE))
+
+if st.session_state.new_data_arrived:
+    save_data()
     st.session_state.new_data_arrived = False
 
-# 6. UI LAYOUT
-st.title("Smart Factory Dashboard")
-st.write(f"Monitoring System Active (Topic: {MQTT_TOPIC})")
+# 5. UI LAYOUT
+st.title("🏭 Smart Factory Dashboard")
+st.write("Motor Monitoring and Vibration Analysis System")
 
-# Sidebar
-# Note: Ensure "1000046431.png" is in the same folder as this script
-if os.path.exists("1000046431.png"):
-    st.sidebar.image("1000046431.png", use_container_width=True)
-else:
-    st.sidebar.warning("Logo image not found.")
+# Sidebar Configuration
+st.sidebar.header("Settings")
+points = st.sidebar.slider("Points to show on graph", 5, 200, 20)
+user_phone = st.sidebar.text_input("Worker Contact", value="+91")
 
-points = st.sidebar.slider("GRAPH PROPORTION (Last N points)", 5, 200, 20)
-user_phone = st.sidebar.text_input("Worker Number", value="+91")
-
-# 7. MAIN DASHBOARD LOGIC
+# 6. DASHBOARD LOGIC
 if not st.session_state.history.empty:
     display_data = st.session_state.history.tail(points)
     last_temp = display_data['Temperature'].iloc[-1]
     last_sound = display_data['sound_level'].iloc[-1]
 
-    # Alerts
-    if last_temp > 75:
-        st.error(f"⚠️ DANGER: Temperature High: {last_temp}°C")
-        # Alert Sound (Hidden HTML)
+    # Alerts & Safety Logic
+    TEMP_LIMIT = 70.0
+    SOUND_LIMIT = 85.0 
+
+    if last_temp > TEMP_LIMIT:
+        st.error(f"🚨 CRITICAL ALERT: Motor Overheating! ({last_temp}°C)")
+        # Alarm sound
         st.components.v1.html("<audio autoplay><source src='https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' type='audio/ogg'></audio>", height=0)
+    elif last_sound > SOUND_LIMIT:
+        st.warning(f"⚠️ WARNING: High Noise Level Detected! ({last_sound}dB)")
     else:
-        st.success(f"✅ System Normal: {last_temp}°C")
+        st.success(f"✅ System Healthy: Operating within normal parameters.")
 
-    # Metrics
+    # Display Metrics
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("Current Temp", f"{last_temp}°C")
-    with col2: st.metric("Max Temp", f"{display_data['Temperature'].max()}°C")
-    with col3: st.metric("Min Temp", f"{display_data['Temperature'].min()}°C")
-    with col4: st.metric("Sound Level", f"{last_sound}dB")
+    with col1: st.metric("🌡️ Temperature", f"{last_temp}°C")
+    with col2: st.metric("📈 Max Temp (Session)", f"{display_data['Temperature'].max()}°C")
+    with col3: st.metric("📉 Min Temp (Session)", f"{display_data['Temperature'].min()}°C")
+    with col4: st.metric("🔊 Sound level", f"{last_sound}dB")
 
-    # Live Graph
-    st.subheader("📊 Performance Graph")
+    # Main Performance Graph
+    st.subheader("📊 Real-time Performance Graph")
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['Temperature'], name='Temp (°C)', line=dict(color='#FF4B4B')))
-    fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['sound_level'], name='Sound (dB)', line=dict(color='#1C83E1')))
-    fig.update_layout(template='plotly_dark', hovermode='x unified', height=400)
+    fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['Temperature'], mode='lines+markers', name='Temp (°C)', line=dict(color='#FF4B4B', width=3)))
+    fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['sound_level'], mode='lines', name='Sound (dB)', line=dict(color='#1C83E1', width=2, dash='dot')))
+    fig.update_layout(template='plotly_dark', xaxis_title='Timestamp', yaxis_title='Reading', hovermode='x unified', height=500)
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.info("⌛ Waiting for sensor data... Please ensure the motor and MQTT publisher are active.")
+    st.info("⌛ Waiting for data from sensors... Please ensure the motor is running and sending MQTT data.")
 
-# 8. HISTORICAL REPORT
+# 7. HISTORICAL REPORT SECTION
 st.markdown("---")
-st.header("🔍 Historical Report")
+st.header("🔍 Historical Data Report")
 selected_date = st.date_input("Select Date", value=datetime.now())
 
-if st.button("Show Report"):
+if st.button("Generate Report"):
     if os.path.exists(LOG_FILE):
         df_h = pd.read_csv(LOG_FILE)
-        # Robust date parsing
+        # Fix date parsing to be robust
         df_h['Date-time'] = pd.to_datetime(df_h['Date-time'], format='%d/%m/%Y | %H:%M:%S', errors='coerce')
         df_h = df_h.dropna(subset=['Date-time'])
         
-        filtered = df_h[df_h['Date-time'].dt.date == selected_date]
+        filtered_data = df_h[df_h['Date-time'].dt.date == selected_date]
         
-        if not filtered.empty:
-            st.write(f"Data for {selected_date}")
-            fig_h = go.Figure()
-            fig_h.add_trace(go.Scatter(x=filtered['Date-time'], y=filtered['Temperature'], name="Temp"))
-            fig_h.add_trace(go.Scatter(x=filtered['Date-time'], y=filtered['sound_level'], name="Sound"))
-            st.plotly_chart(fig_h, use_container_width=True)
-            st.dataframe(filtered)
+        if not filtered_data.empty:
+            st.success(f"Report for {selected_date}")
+            fig_rep = go.Figure()
+            fig_rep.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['Temperature'], name='Temp'))
+            fig_rep.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['sound_level'], name='Sound'))
+            fig_rep.update_layout(template='plotly_dark')
+            st.plotly_chart(fig_rep, use_container_width=True)
+            
+            st.download_button("📥 Download CSV", data=filtered_data.to_csv(index=False), file_name=f"report_{selected_date}.csv")
         else:
-            st.warning(f"No data found for {selected_date}")
+            st.warning("No data found for this date.")
     else:
-        st.error("No log file found yet.")
+        st.error("No log file found.")
 
-# Auto-refresh every 2 seconds
+# 8. AUTO-REFRESH
+st.markdown("---")
+st.write(f"🕒 **Last Sync: {datetime.now().strftime('%H:%M:%S')}**")
 time.sleep(2)
 st.rerun()
