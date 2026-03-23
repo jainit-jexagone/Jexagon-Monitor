@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -137,29 +136,31 @@ if new_sound > SOUND_LIMIT:
 
 user_phone = st.sidebar.text_input("worker number", value="+91")
 
+
+st.sidebar.image("1000046431.png", use_container_width=True)
+st.sidebar.markdown("<h3 style='text-align: center; color: gold;'>ORIX IoT</h3>", unsafe_allow_html=True)
+
+# ૨. મેઈન ડિસ્પ્લે લોજિક (આને બરાબર ફોલો કરજે)
 if not st.session_state.history.empty:
     display_data = st.session_state.history.tail(points)
     last_temp = display_data['Temperature'].iloc[-1]
     last_sound = display_data['sound_level'].iloc[-1]
 
-    # ૨. મેટ્રિક્સ ડિસ્પ્લે
+    # મેટ્રિક્સ
     col1, col2, col3, col4 = st.columns(4)
-    max_temp = display_data['Temperature'].max()
-    min_temp = display_data['Temperature'].min()
-    
     with col1: st.metric("🌡️ Current Temp", f"{last_temp}°C")
-    with col2: st.metric("📈 Max Temp", f"{max_temp}°C")
-    with col3: st.metric("📉 Min Temp", f"{min_temp}°C")
+    with col2: st.metric("📈 Max Temp", f"{display_data['Temperature'].max()}°C")
+    with col3: st.metric("📉 Min Temp", f"{display_data['Temperature'].min()}°C")
     with col4: st.metric("🔊 Sound Level", f"{last_sound}dB")
 
-    # ૩. એલર્ટ્સ
+    # એલર્ટ્સ
     if last_temp > 70 or last_sound > 85:
         st.error("🚨 CRITICAL ALERT! Motor at Risk!")
         st.components.v1.html("<audio autoplay><source src='https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' type='audio/ogg'></audio>", height=0)
     else:
         st.success(f"✅ System Healthy: {last_temp}°C | {last_sound}dB")
 
-    # ૪. લાઈવ ગ્રાફ (આ હવે અહીં સુરક્ષિત છે)
+    # લાઈવ ગ્રાફ
     st.subheader("📊 ORIX Live Performance Graph")
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['Temperature'], mode='lines+markers', name='Temp (°C)', line=dict(color='#FF4B4B')))
@@ -168,70 +169,37 @@ if not st.session_state.history.empty:
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    # જો ડેટા ના હોય તો માત્ર આ મેસેજ
+    # જો ડેટા ના હોય તો માત્ર આ મેસેજ દેખાશે
     st.info("⌛ Waiting for data from ORIX sensors... Please start the motor.")
-       
 st.markdown("---")
 st.header("🔍 Historical Data Report (Calendar)")
 
 selected_date = st.date_input("Select Date for Report", value=datetime.now())
 
 if st.button("Show Report"):
-    LOG_FILE = "motor_logs.csv"
-    
     if os.path.exists(LOG_FILE):
         df_h = pd.read_csv(LOG_FILE)
-        
         df_h['Date-time'] = pd.to_datetime(df_h['Date-time'], format='%d/%m/%Y | %H:%M:%S')
-        
         filtered_data = df_h[df_h['Date-time'].dt.date == selected_date]
         
         if not filtered_data.empty:
             st.success(f"📊 Displaying report for {selected_date}")
-            
             fig_report = go.Figure()
             fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['Temperature'], name='Temp (°C)', line=dict(color='#FF4B4B')))
             fig_report.add_trace(go.Scatter(x=filtered_data['Date-time'], y=filtered_data['sound_level'], name='Sound (dB)', line=dict(color='#1C83E1')))
-            
             fig_report.update_layout(title=f"Motor Performance on {selected_date}", template='plotly_dark')
             st.plotly_chart(fig_report, use_container_width=True)
             
-            with st.expander("View Detailed Log Table"):
-                st.write(filtered_data)
-                
             csv_data = filtered_data.to_csv(index=False)
-            st.download_button("📥 Download This Report", data=csv_data, file_name=f"report_{selected_date}.csv", mime='text/csv')
+            st.download_button("📥 Download This Report", data=csv_data, file_name=f"ORIX_report_{selected_date}.csv", mime='text/csv')
         else:
-            st.warning(f"⚠️ No data found for {selected_date}. Make sure the machine was ON.")
+            st.warning(f"⚠️ No data found for {selected_date}.")
     else:
-        st.error("❌ No log file found. Start the motor to generate data!")
+        st.error("❌ No log file found.")
 
 st.markdown("---") 
 st.write(f"🕒 **Last Updated: {current_time}**")
-       
-st.markdown("---")
-st.subheader("📊 GRAPH")
 
-fig = go.Figure()
-
-fig.add_trace(go.Scatter(x=display_data['Date-time'], 
-                         y=display_data['Temperature'],
-                         mode='lines+markers', 
-                         name='તાપમાન (°C)',
-                         line=dict(color='#FF4B4B', width=3)))
-
-fig.add_trace(go.Scatter(x=display_data['Date-time'], 
-                         y=display_data['sound_level'],
-                         mode='lines', 
-                         name='sound (dB)',
-                         line=dict(color='#1C83E1', width=2, dash='dot')))
-
-fig.update_layout(template='plotly_dark', 
-                  xaxis_title='time', 
-                  yaxis_title='value',
-                  hovermode='x unified')
-
-st.plotly_chart(fig, use_container_width=True)
-
+# આ લાઈન સૌથી મહત્વની છે લાઈવ અપડેટ માટે
 time.sleep(2)
 st.rerun()
