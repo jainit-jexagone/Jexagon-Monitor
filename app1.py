@@ -9,7 +9,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 # ૧. પેજ સેટઅપ (આખા કોડમાં સૌથી પહેલી લાઈન)
-st.set_page_config(page_title="ORIX Smart Factory", page_icon="1000046431.png", layout="wide")
 
 # CSS - વધારાનું મેનુ હાઈડ કરવા માટે
 hide_style = """
