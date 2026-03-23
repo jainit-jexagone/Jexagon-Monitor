@@ -1,9 +1,9 @@
+st.set_page_config(page_title="ORIX Smart Factory", page_icon="1000046431.png", layout="wide")
 import streamlit as st
 import pandas as pd
 import numpy as np
 import time
 from datetime import datetime
-LOG_FILE = "motor_logs.csv"
 import os
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
@@ -20,18 +20,19 @@ st.set_page_config(
     }
 )
 
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            [data-testid="stDecoration"] {display:none !important;} 
-            [data-testid="stHeader"] {display:none !important;}    
-            .stDeployButton {display:none !important;}            
-            footer {display:none !important;}                   
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    /* આ નીચેની લાઈન ખાસ ઉમેરજો Footer અને Badge કાઢવા માટે */
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    .viewerBadge_container__1QS13 {display: none !important;}
+    div.stDeployButton {display:none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_html=True)
+
 hide_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -41,34 +42,53 @@ hide_style = """
     </style>
     """
 st.markdown(hide_style, unsafe_allow_html=True)
-
+LOG_FILE = "motor_logs.csv"
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_TOPIC = "janit/motor/data"
 
 def on_message(client, userdata, msg):
     try:
-    
-        data = json.loads(msg.payload.decode())
-        st.session_state.temp = data['temp']
-        st.session_state.sound = data['sound']
+        # ૧. માત્ર ડેટા ડિકોડ કરો
+        payload = msg.payload.decode()
+        data = json.loads(payload)
         
-        now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
-        new_row = pd.DataFrame([[now, data['temp'], data['sound']]], 
-                                columns=['Date-time', 'Temperature', 'sound_level'])
+        # ૨. સ્ટેટમાં વેલ્યુ ભરો
+        st.session_state.temp = float(data.get('temp', 0))
+        st.session_state.sound = float(data.get('sound', 0))
         
-        st.session_state.history = pd.concat([st.session_state.history, new_row], ignore_index=True)
-        
-        new_row.to_csv(LOG_FILE, mode='a', index=False, header=not os.path.exists(LOG_FILE))
+        # ૩. મેઈન કોડને સિગ્નલ આપો
+        st.session_state.new_data_arrived = True 
     except Exception as e:
-        pass
+        print(f"MQTT Error: {e}")
+def save_to_csv_and_update_history():
+    # ૧. સમય અને ડેટા મેળવો
+    now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
+    temp = st.session_state.temp
+    sound = st.session_state.sound
+    
+    # ૨. નવો ડેટા ફ્રેમ બનાવો
+    new_row = pd.DataFrame([[now, temp, sound]], 
+                            columns=['Date-time', 'Temperature', 'sound_level'])
+    
+    # ૩. હિસ્ટ્રીમાં ઉમેરો (Live Graph માટે)
+    st.session_state.history = pd.concat([st.session_state.history, new_row], ignore_index=True)
+    
+    # ૪. CSV માં સેવ કરો (Calendar Report માટે)
+    new_row.to_csv(LOG_FILE, mode='a', index=False, header=not os.path.exists(LOG_FILE))
+# --- હવે નીચે મેઈન કોડમાં આ લાઈન લખવી ---
+if st.session_state.get('new_data_arrived', False):
+    # અહીં બધું સેવિંગ અને કોન્કેટ કરવાનું કામ કરો
+    # આનાથી CSV ફાઈલ સુરક્ષિત રહેશે
+    save_to_csv_and_update_history() 
+    st.session_state.new_data_arrived = False # કામ પત્યા પછી ફ્લેગ બંધ કરો
 
-if 'mqtt_connected' not in st.session_state:
+if 'mqtt_client' not in st.session_state:
     client = mqtt.Client()
     client.on_message = on_message
     client.connect(MQTT_BROKER, 1883, 60)
     client.subscribe(MQTT_TOPIC)
-    client.loop_start()
-    st.session_state.mqtt_connected = True
+    client.loop_start() # આ બેકગ્રાઉન્ડમાં ચાલતું રહેશે
+    st.session_state.mqtt_client = client
 
 def cleanup_old_data(filename):
     if os.path.exists(filename):
@@ -105,18 +125,6 @@ if 'sound' not in st.session_state: st.session_state.sound = 0.0
 new_temp = st.session_state.temp
 new_sound = st.session_state.sound
 
-def on_message(client, userdata, msg):
-    payload = msg.payload.decode()
-    val = float(payload)
-    if "field1" in msg.topic:
-        st.session_state.temp = val
-    elif "field2" in msg.topic:
-        st.session_state.sound = val
-
-
-new_data = pd.DataFrame({ 'Date-time': [now], 
-                         'Temperature': [new_temp],
-                         'sound_level': [new_sound]})
 TEMP_LIMIT = 70.0
 SOUND_LIMIT = 85.0 
 
@@ -129,60 +137,40 @@ if new_sound > SOUND_LIMIT:
 
 user_phone = st.sidebar.text_input("worker number", value="+91")
 
-st.session_state.history = pd.concat([st.session_state.history, new_data], ignore_index=True)
+if not st.session_state.history.empty:
+    display_data = st.session_state.history.tail(points)
+    last_temp = display_data['Temperature'].iloc[-1]
+    last_sound = display_data['sound_level'].iloc[-1]
 
-display_data = st.session_state.history.tail(points)
+    # ૨. મેટ્રિક્સ ડિસ્પ્લે
+    col1, col2, col3, col4 = st.columns(4)
+    max_temp = display_data['Temperature'].max()
+    min_temp = display_data['Temperature'].min()
+    
+    with col1: st.metric("🌡️ Current Temp", f"{last_temp}°C")
+    with col2: st.metric("📈 Max Temp", f"{max_temp}°C")
+    with col3: st.metric("📉 Min Temp", f"{min_temp}°C")
+    with col4: st.metric("🔊 Sound Level", f"{last_sound}dB")
 
-last_temp =display_data['Temperature'].iloc[-1]
+    # ૩. એલર્ટ્સ
+    if last_temp > 70 or last_sound > 85:
+        st.error("🚨 CRITICAL ALERT! Motor at Risk!")
+        st.components.v1.html("<audio autoplay><source src='https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg' type='audio/ogg'></audio>", height=0)
+    else:
+        st.success(f"✅ System Healthy: {last_temp}°C | {last_sound}dB")
 
-if last_temp < 75:
-    st.success(f"System Healthy: {last_temp}°C")
+    # ૪. લાઈવ ગ્રાફ (આ હવે અહીં સુરક્ષિત છે)
+    st.subheader("📊 ORIX Live Performance Graph")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['Temperature'], mode='lines+markers', name='Temp (°C)', line=dict(color='#FF4B4B')))
+    fig.add_trace(go.Scatter(x=display_data['Date-time'], y=display_data['sound_level'], mode='lines', name='Sound (dB)', line=dict(color='#1C83E1', dash='dot')))
+    fig.update_layout(template='plotly_dark', hovermode='x unified')
+    st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.error(f"High Temp Alert: {last_temp}°C")
-
-last_sound=display_data['sound_level'].iloc[-1]
-
-if last_sound > 85:
-    st.error(f"sound is very high: {last_sound}dB")
-else:
-    st.success(f"sound is maintain :{last_sound}dB")
-
-critical_condition = (last_temp > 75) or (last_sound > 85)
-if critical_condition:
-    st.error("🚨 CRITICAL ALERT! Motor at Risk!")
-    st.components.v1.html(
-        """
-        <audio autoplay>
-          <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" type="audio/ogg">
-        </audio>
-        """,
-        height=0
-    )        
-else:   st.success(f"✅ System Normal: {last_temp}°C | {last_sound}dB")    
-
-max_temp = display_data['Temperature'].max()
-min_temp = display_data['Temperature'].min()
-
-new_entry = pd.DataFrame([[current_time, new_temp, new_sound]], 
-                         columns=['Date-time', 'Temperature', 'sound_level'])
-
-if not os.path.isfile(LOG_FILE):
-    new_entry.to_csv(LOG_FILE, index=False)
-else:
-    new_entry.to_csv(LOG_FILE, mode='a', index=False, header=False)
-
-col1, col2, col3, col4  = st.columns(4)
-
-with col1:
-    st.metric("હાલનું (Current)", f"{last_temp}°C")
-with col2:
-    st.metric("મહત્તમ (Max)", f"{max_temp}°C")
-with col3:
-    st.metric("ન્યૂનતમ (Min)", f"{min_temp}°C")
-with col4:
-    st.metric("sound level",f"{last_sound}dB") 
-
+    # જો ડેટા ના હોય તો માત્ર આ મેસેજ
+    st.info("⌛ Waiting for data from ORIX sensors... Please start the motor.")
+       
 st.markdown("---")
 st.header("🔍 Historical Data Report (Calendar)")
 
