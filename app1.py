@@ -29,7 +29,7 @@ st.markdown(hide_style, unsafe_allow_html=True)
 
 LOG_FILE = "motor_logs.csv"
 MQTT_BROKER = "broker.hivemq.com"
-MQTT_PORT = 8000
+MQTT_PORT = 80
 MQTT_TOPIC = "orix/factory/janit/99"
 
 # 2. INITIALIZE SESSION STATE (At the very beginning)
