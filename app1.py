@@ -28,8 +28,8 @@ hide_style = """
 st.markdown(hide_style, unsafe_allow_html=True)
 
 LOG_FILE = "motor_logs.csv"
-MQTT_BROKER = "test.mosquitto.org"
-MQTT_TOPIC = "janit/motor/data"
+MQTT_BROKER = "broker.emqx.io"
+MQTT_TOPIC = "orix/factory/janit/99"
 
 # 2. INITIALIZE SESSION STATE (At the very beginning)
 if 'temp' not in st.session_state: st.session_state.temp = 0.0
