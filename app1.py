@@ -71,7 +71,7 @@ if 'mqtt_client' not in st.session_state:
     
     # સુરક્ષિત કનેક્શન
     try:
-        client.connect(MQTT_BROKER, 1883, 60)
+        client.connect(MQTT_BROKER, 8083, 60)
         client.subscribe(MQTT_TOPIC)
         client.loop_start()
         st.session_state.mqtt_client = client
