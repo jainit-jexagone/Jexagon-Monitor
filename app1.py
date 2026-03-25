@@ -47,31 +47,35 @@ if 'history' not in st.session_state:
     else:
         st.session_state.history = pd.DataFrame(columns=['Date-time', 'Temperature', 'sound_level'])
 
-# 3. MQTT CALLBACKS
+# ૧. આ ફંક્શનને બરાબર આ રીતે અપડેટ કરો
 def on_message(client, userdata, msg):
     try:
         payload = msg.payload.decode()
         data = json.loads(payload)
+        
+        # આ વેલ્યુ સીધી સેશનમાં સેવ કરો
         st.session_state.temp = float(data.get('temp', 0))
         st.session_state.sound = float(data.get('sound', 0))
         st.session_state.new_data_arrived = True 
-    except Exception as e:
-        pass
-
-# Initialize MQTT Client
-if 'mqtt_client' not in st.session_state:
-    try:
-        # Support for both paho-mqtt 1.x and 2.x
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    except:
-        client = mqtt.Client()
         
-    client.on_message = on_message
-    client.connect(MQTT_BROKER, 1883, 60)
-    client.subscribe(MQTT_TOPIC)
-    client.loop_start()
-    st.session_state.mqtt_client = client
+        # ટર્મિનલમાં ચેક કરવા માટે (ઓનરને નહીં દેખાય)
+        print(f"MQTT Received: {payload}")
+    except Exception as e:
+        print(f"Error Decoding: {e}")
 
+# ૨. MQTT કનેક્શનમાં 'KeepAlive' વધારી દો
+if 'mqtt_client' not in st.session_state:
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_message = on_message
+    
+    # સુરક્ષિત કનેક્શન
+    try:
+        client.connect(MQTT_BROKER, 1883, 60)
+        client.subscribe(MQTT_TOPIC)
+        client.loop_start()
+        st.session_state.mqtt_client = client
+    except Exception as e:
+        st.error(f"MQTT Connection Error: {e}")
 # 4. DATA PROCESSING
 def save_data():
     now = datetime.now().strftime("%d/%m/%Y | %H:%M:%S")
