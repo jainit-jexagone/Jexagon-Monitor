@@ -28,7 +28,7 @@ hide_style = """
 st.markdown(hide_style, unsafe_allow_html=True)
 
 LOG_FILE = "motor_logs.csv"
-MQTT_BROKER = "mqtt.eclipseprojects.io"
+MQTT_BROKER = "test.mosquitto.org"
 MQTT_TOPIC = "janit/motor/data"
 
 # 2. INITIALIZE SESSION STATE (At the very beginning)
