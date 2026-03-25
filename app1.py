@@ -28,8 +28,8 @@ hide_style = """
 st.markdown(hide_style, unsafe_allow_html=True)
 
 LOG_FILE = "motor_logs.csv"
-MQTT_BROKER = "broker.emqx.io"
-MQTT_PORT = 8083
+MQTT_BROKER = "test.mosquitto.org"
+MQTT_PORT = 80
 MQTT_TOPIC = "orix/factory/janit/99"
 
 # 2. INITIALIZE SESSION STATE (At the very beginning)
@@ -71,7 +71,7 @@ if 'mqtt_client' not in st.session_state:
     
     # સુરક્ષિત કનેક્શન
     try:
-        client.connect(MQTT_BROKER, 8083, 60)
+        client.connect(MQTT_BROKER,MQTT_PORT, 60)
         client.subscribe(MQTT_TOPIC)
         client.loop_start()
         st.session_state.mqtt_client = client
